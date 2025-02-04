@@ -1,114 +1,75 @@
 """
 config.py
 
-モデル学習の設定を管理するモジュール。
+モデル学習の設定パラメータ
 """
 
-import os
-from typing import Dict, Any
+# Directory Settings
+REPORT_DIR = 'reports'
+LOG_DIR = 'logs'
+MODEL_SAVE_DIR = 'models'
 
-# Alpha Vantage設定
-ALPHA_VANTAGE_CONFIG = {
-    'api_key': "HIB19MS8JAUS2ABC",
-    'symbol': "NVDA",
-    'interval': "1min",
-    'start_date': "2024-12-01",
-    'requests_per_minute': 5
+# Logging Settings
+LOG_LEVEL = 'INFO'
+LOG_FORMAT = "%(asctime)s [%(levelname)s] %(message)s"
+
+# Default Settings
+DEFAULT_SETTINGS = {
+    # Data Settings
+    'TARGET_SYMBOL': 'NVDA',
+    'DATA_INTERVAL': '1min',
+    'START_DATE': '2025-01-01',
+    
+    # Model Settings
+    'MODEL_TYPE': 'lstm',
+    'SEQUENCE_LENGTH': 10,
+    'PREDICTION_TARGET': 1
 }
 
-# データ設定
-DATA_CONFIG = {
-    'raw_dir': '../data/raw',
-    'processed_dir': '../data/processed',
-    'features_dir': '../data/features',
-    'test_size': 0.2,
-    'validation_size': 0.2,
-    'sequence_length': 10
+# Model Parameters
+MODEL_PARAMS = {
+    'lstm': {
+        'sequence_length': 10,
+        'epochs': 50,
+        'batch_size': 32,
+        'learning_rate': 0.001
+    }
 }
 
-# 特徴量設定
-FEATURE_CONFIG = {
-    'sequence_features': [
-        'close',
-        'volume',
-        'sma',
-        'rsi',
-        'macd',
-        'macd_signal',
-        'bb_upper',
-        'bb_lower'
+# Data Processing
+FEATURE_COLUMNS = [
+    'Close',
+    'Volume',
+    'RSI',
+    'MACD',
+    'Signal_Line',
+    'BB_Upper',
+    'BB_Lower',
+    'Momentum'
+]
+
+# Training Settings
+TRAIN_TEST_SPLIT = 0.8
+VALIDATION_SPLIT = 0.2
+RANDOM_SEED = 42
+
+# Early Stopping
+EARLY_STOPPING = {
+    'patience': 10,
+    'min_delta': 0.001
+}
+
+def create_directories():
+    """必要なディレクトリを作成"""
+    import os
+    directories = [
+        REPORT_DIR,
+        LOG_DIR,
+        MODEL_SAVE_DIR
     ]
-}
+    for directory in directories:
+        if not os.path.exists(directory):
+            os.makedirs(directory)
 
-# LSTMモデル設定
-MODEL_CONFIG = {
-    'architecture': {
-        'lstm_layers': [50, 25],  # 2層のLSTM
-        'dense_layers': [10],     # 1層のDense
-        'dropout_rate': 0.2,
-        'activation': 'relu',
-        'output_activation': 'linear'
-    },
-    'training': {
-        'batch_size': 16,         # バッチサイズを小さく
-        'epochs': 100,            # エポック数を増やす
-        'learning_rate': 0.0005,  # 学習率を小さく
-        'early_stopping_patience': 10  # より長い待機
-    }
-}
-
-# 評価設定
-EVALUATION_CONFIG = {
-    'metrics': [
-        'mse',
-        'mae',
-        'rmse',
-        'mape',
-        'directional_accuracy'
-    ],
-    'visualization': {
-        'show_predictions': True,
-        'show_feature_importance': True,
-        'save_plots': True
-    }
-}
-
-def get_model_path(model_id: str) -> str:
-    """
-    モデルの保存パスを取得
-
-    Args:
-        model_id: モデルの識別子
-
-    Returns:
-        モデルの保存ディレクトリパス
-    """
-    base_dir = '../models'
-    return os.path.join(base_dir, model_id)
-
-def create_model_config(
-    model_id: str,
-    features: list,
-    training_period: str,
-    performance: Dict[str, float]
-) -> Dict[str, Any]:
-    """
-    モデル設定ファイルの内容を生成
-
-    Args:
-        model_id: モデルの識別子
-        features: 使用した特徴量
-        training_period: 学習期間
-        performance: パフォーマンス指標
-
-    Returns:
-        設定ファイルの内容
-    """
-    return {
-        'model_id': model_id,
-        'model_type': 'lstm',
-        'features': features,
-        'training_period': training_period,
-        'performance_metrics': performance,
-        'model_params': MODEL_CONFIG
-    }
+# 起動時にディレクトリを作成
+create_directories()

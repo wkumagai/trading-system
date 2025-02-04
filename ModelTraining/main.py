@@ -13,6 +13,7 @@ from dotenv import load_dotenv
 
 from data_collection.fetcher import MarketDataFetcher
 from training.train import train_model
+from training.config import DEFAULT_SETTINGS
 
 def setup_logging(log_dir: str) -> None:
     """
@@ -46,17 +47,17 @@ def main():
     parser = argparse.ArgumentParser(description='LSTM Model Training')
     parser.add_argument(
         '--symbol',
-        default=os.getenv('TARGET_SYMBOL'),
+        default=DEFAULT_SETTINGS['TARGET_SYMBOL'],
         help='Target symbol (e.g., NVDA)'
     )
     parser.add_argument(
         '--interval',
-        default=os.getenv('DATA_INTERVAL'),
+        default=DEFAULT_SETTINGS['DATA_INTERVAL'],
         help='Data interval (e.g., 1min)'
     )
     parser.add_argument(
         '--model-type',
-        default=os.getenv('MODEL_TYPE'),
+        default=DEFAULT_SETTINGS['MODEL_TYPE'],
         help='Model type (e.g., lstm)'
     )
     
@@ -95,12 +96,6 @@ def main():
 
 def run_example():
     """使用例の実行"""
-    # 環境変数の設定
-    os.environ['TARGET_SYMBOL'] = 'NVDA'
-    os.environ['DATA_INTERVAL'] = '1min'
-    os.environ['MODEL_TYPE'] = 'lstm'
-    
-    # メイン処理の実行
     main()
 
 if __name__ == "__main__":
