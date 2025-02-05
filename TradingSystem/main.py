@@ -1,153 +1,199 @@
 """
-main.py
-
-Tradingシステムのメインエントリーポイント。
+メイン実行スクリプト
+戦略の実行とIBKRでの取引を管理
 """
 
-import os
-import argparse
-import pandas as pd
-from dotenv import load_dotenv
+import asyncio
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime
+import pandas as pd
+from typing import Dict, List
+import os
+from dotenv import load_dotenv
 
-def setup_logging():
-    """ロギングの設定"""
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s [%(levelname)s] %(message)s',
-        handlers=[
-            logging.StreamHandler(),
-            logging.FileHandler(f'logs/trading_{datetime.now().strftime("%Y%m%d")}.log')
-        ]
-    )
-    return logging.getLogger(__name__)
+from core.strategy_manager import StrategyManager
+from execution.trade_executor import TradeExecutor
+from execution.ib_executor import IBExecutor
 
-def run_trading(mode: str, **kwargs):
-    """
-    トレーディングシステムの実行
+# 環境変数の読み込み
+load_dotenv()
 
-    Args:
-        mode: 実行モード ('daily', 'backtest', or 'compare')
-        kwargs: 追加パラメータ
-    """
-    from core.strategy_manager import StrategyManager
-    from strategies.moving_average import MovingAverageStrategy
-    from strategies.deep_learning import LSTMStrategy
-    from evaluation.evaluator import StrategyEvaluator
-    from reporting.reporter import StrategyReporter
-    from core.data_manager import DataManager
-    import config.config as config
-
-    # データ取得
-    symbol = kwargs.get('symbol', 'AAPL')
-    start_date = kwargs.get('start_date', (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d'))
-    end_date = kwargs.get('end_date', datetime.now().strftime('%Y-%m-%d'))
-
-    dm = DataManager(config)
-    df = dm.fetch_market_data(symbol, start_date, end_date, interval="1min")
-
-    if df.empty:
-        logging.error("No data fetched. Exiting.")
-        return
-
-    # 戦略マネージャーの設定
-    manager = StrategyManager(config)
-
-    # 戦略の登録
-    strategies = [
-        MovingAverageStrategy(config, short_window=5, long_window=20),
-        MovingAverageStrategy(config, short_window=10, long_window=30),
-        LSTMStrategy(config, sequence_length=10),
-        LSTMStrategy(config, sequence_length=20)
+# ロギングの設定
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] %(message)s',
+    handlers=[
+        logging.FileHandler('logs/trading.log'),
+        logging.StreamHandler()
     ]
-    manager.register_multiple_strategies(strategies)
+)
+logger = logging.getLogger(__name__)
 
-    # モード別の処理
-    if mode == 'daily':
-        # 日次処理（最適な戦略で実取引）
-        results = manager.run_all_strategies(df)
-        evaluator = StrategyEvaluator()
-        performance = evaluator.evaluate_multiple_strategies(results)
-        
-        # 最良の戦略を選択
-        best_strategy = performance['sharpe_ratio'].idxmax()
-        logging.info(f"Selected best strategy: {best_strategy}")
-        
-        # 選択した戦略の最新の予測に基づいて取引実行
-        latest_signals = results[best_strategy]['predictions'].iloc[-1:]
-        if not latest_signals.empty:
-            signal = latest_signals['signal'].iloc[0]
-            if signal != 0:
-                logging.info(f"Executing trade with signal: {signal}")
-                # TODO: 実取引の実装
+class TradingSystem:
+    """取引システムのメインクラス"""
     
-    elif mode == 'backtest':
-        # 単一戦略のバックテスト
-        strategy_name = kwargs.get('strategy', 'moving_average_5_20')
-        if strategy_name in manager.strategies:
-            strategy = manager.strategies[strategy_name]
-            result = manager._run_single_strategy(strategy_name, df)
-            
-            evaluator = StrategyEvaluator()
-            performance = evaluator.evaluate_strategy(result['predictions'])
-            
-            reporter = StrategyReporter()
-            reporter.generate_report(
-                {strategy_name: result['predictions']},
-                pd.DataFrame([performance], index=[strategy_name])
-            )
-    
-    else:  # compare mode
-        # 全戦略の比較
-        results = manager.run_all_strategies(df)
+    def __init__(
+        self,
+        symbols: List[str],
+        initial_capital: float = 1000000,
+        paper_trading: bool = True
+    ):
+        """
+        初期化
+        Args:
+            symbols: 取引対象の銘柄リスト
+            initial_capital: 初期資金
+            paper_trading: ペーパートレードモードかどうか
+        """
+        self.symbols = symbols
+        self.paper_trading = paper_trading
         
-        evaluator = StrategyEvaluator()
-        performance = evaluator.evaluate_multiple_strategies(results)
+        # 戦略マネージャーの初期化
+        self.strategy_manager = StrategyManager()
         
-        reporter = StrategyReporter()
-        reporter.generate_report(
-            {name: result['predictions'] for name, result in results.items()},
-            performance,
-            f"Strategy Comparison Report ({symbol})"
+        # 取引実行システムの初期化
+        self.executor = TradeExecutor(
+            initial_capital=initial_capital,
+            paper_trading=paper_trading
         )
-
-def main():
-    """メイン実行関数"""
-    # 環境変数の読み込み
-    load_dotenv()
-
-    # ロギングの設定
-    logger = setup_logging()
-
-    # コマンドライン引数の解析
-    parser = argparse.ArgumentParser(description='Trading System')
-    parser.add_argument('--mode', choices=['daily', 'backtest', 'compare'],
-                       default='daily', help='Operation mode')
-    parser.add_argument('--symbol', default='AAPL',
-                       help='Stock symbol for backtest/compare mode')
-    parser.add_argument('--start-date', help='Start date for backtest/compare mode')
-    parser.add_argument('--end-date', help='End date for backtest/compare mode')
-    parser.add_argument('--strategy', help='Strategy name for backtest mode')
-
-    args = parser.parse_args()
-
-    try:
-        logger.info(f"Starting Trading System (Mode: {args.mode})")
         
-        kwargs = {
-            'symbol': args.symbol,
-            'start_date': args.start_date,
-            'end_date': args.end_date,
-            'strategy': args.strategy
-        }
+        self.running = False
 
-        run_trading(args.mode, **kwargs)
-        logger.info("Processing completed successfully")
+    async def start(self):
+        """取引システムの開始"""
+        try:
+            logger.info("Starting trading system...")
+            
+            # 取引実行システムの開始
+            if not await self.executor.start():
+                logger.error("Failed to start trade executor")
+                return
+            
+            self.running = True
+            logger.info("Trading system started successfully")
+            
+            # メインループの開始
+            await self._main_loop()
+            
+        except Exception as e:
+            logger.error(f"Error starting trading system: {str(e)}")
+            await self.stop()
 
-    except Exception as e:
-        logger.error(f"Error occurred: {str(e)}", exc_info=True)
-        raise
+    async def stop(self):
+        """取引システムの停止"""
+        try:
+            self.running = False
+            await self.executor.stop()
+            logger.info("Trading system stopped")
+        except Exception as e:
+            logger.error(f"Error stopping trading system: {str(e)}")
+
+    async def _main_loop(self):
+        """メインの取引ループ"""
+        while self.running:
+            try:
+                # 現在のポジションを取得
+                positions = await self.executor.get_current_positions()
+                logger.info(f"Current positions: {positions}")
+                
+                # 各銘柄の処理
+                for symbol in self.symbols:
+                    # 市場データの取得
+                    market_data = await self._get_market_data(symbol)
+                    if market_data is None:
+                        continue
+                    
+                    # 戦略の実行
+                    signals = self.strategy_manager.execute(symbol, market_data)
+                    
+                    # 現在価格の取得
+                    current_prices = {
+                        symbol: market_data['Close'].iloc[-1]
+                    }
+                    
+                    # 取引シグナルの実行
+                    results = await self.executor.execute_signals(
+                        signals,
+                        current_prices
+                    )
+                    
+                    # 結果のログ出力
+                    for symbol, trades in results.items():
+                        for trade in trades:
+                            logger.info(f"Trade executed: {trade}")
+                
+                # 1分待機
+                await asyncio.sleep(60)
+                
+            except Exception as e:
+                logger.error(f"Error in main loop: {str(e)}")
+                await asyncio.sleep(60)  # エラー時も1分待機
+
+    async def _get_market_data(self, symbol: str) -> pd.DataFrame:
+        """
+        市場データの取得
+        Args:
+            symbol: 銘柄コード
+        Returns:
+            市場データ
+        """
+        try:
+            # IBKRから市場データを取得
+            contract = self.executor.executor.create_contract(symbol)
+            bars = self.executor.executor.ib.reqHistoricalData(
+                contract,
+                endDateTime='',
+                durationStr='2 D',
+                barSizeSetting='1 min',
+                whatToShow='TRADES',
+                useRTH=True
+            )
+            
+            if not bars:
+                logger.warning(f"No market data available for {symbol}")
+                return None
+            
+            # DataFrameに変換
+            df = pd.DataFrame({
+                'Date': [bar.date for bar in bars],
+                'Open': [bar.open for bar in bars],
+                'High': [bar.high for bar in bars],
+                'Low': [bar.low for bar in bars],
+                'Close': [bar.close for bar in bars],
+                'Volume': [bar.volume for bar in bars]
+            })
+            
+            df.set_index('Date', inplace=True)
+            return df
+            
+        except Exception as e:
+            logger.error(f"Error getting market data for {symbol}: {str(e)}")
+            return None
+
+async def main():
+    """メイン関数"""
+    # 取引対象の銘柄
+    symbols = ['NVDA']
+    
+    # 取引システムの初期化
+    system = TradingSystem(
+        symbols=symbols,
+        initial_capital=1000000,  # 100万ドル
+        paper_trading=True  # ペーパートレードモード
+    )
+    
+    try:
+        # システムの開始
+        await system.start()
+        
+        # Ctrl+Cで停止するまで実行
+        while True:
+            await asyncio.sleep(1)
+            
+    except KeyboardInterrupt:
+        logger.info("Shutting down...")
+        await system.stop()
 
 if __name__ == "__main__":
-    main()
+    # イベントループの実行
+    asyncio.run(main())
