@@ -1,10 +1,9 @@
 """
-config.py
-
 Tradingシステムの設定ファイル
 """
 
 import os
+from datetime import datetime, timedelta
 
 # Environment Variables (from .env)
 STOCK_API_KEY = os.getenv('STOCK_API_KEY')
@@ -25,8 +24,8 @@ DEFAULT_SETTINGS = {
     # Data Settings
     'TARGET_SYMBOL': 'NVDA',
     'DATA_INTERVAL': '1min',
-    'START_DATE': '2025-01-01',
-    
+    'START_DATE': (datetime.now() - timedelta(days=365)).strftime('%Y-%m-%d'),  # 1年前から
+
     # Model Settings
     'MODEL_TYPE': 'lstm',
     'SEQUENCE_LENGTH': 10,
@@ -34,8 +33,8 @@ DEFAULT_SETTINGS = {
 }
 
 # Application Settings
-INITIAL_CAPITAL = 100000
-COMMISSION_RATE = 0.001  # 取引手数料（0.1%）
+INITIAL_CAPITAL = 1000000  # 実際の運用資金に応じて調整
+COMMISSION_RATE = 0.0015   # 取引手数料（0.15%）
 
 # Strategy Parameters
 STRATEGY_PARAMS = {
@@ -51,13 +50,13 @@ STRATEGY_PARAMS = {
 }
 
 # Risk Management
-MAX_POSITION_SIZE = 0.2  # 最大ポジションサイズ（資金に対する割合）
-STOP_LOSS_PCT = 0.02    # ストップロス（2%）
-TAKE_PROFIT_PCT = 0.05  # 利益確定（5%）
+MAX_POSITION_SIZE = 0.1    # 最大ポジションサイズ（資金の10%）
+STOP_LOSS_PCT = 0.03      # ストップロス（3%）
+TAKE_PROFIT_PCT = 0.06    # 利益確定（6%）
 
 # Performance Thresholds
-MIN_SHARPE_RATIO = 0.5
-MAX_DRAWDOWN_LIMIT = -0.15  # 最大ドローダウン制限（-15%）
+MIN_SHARPE_RATIO = 1.0
+MAX_DRAWDOWN_LIMIT = -0.10  # 最大ドローダウン制限（-10%）
 
 # Feature Settings
 FEATURE_COLUMNS = [
@@ -73,17 +72,17 @@ FEATURE_COLUMNS = [
 
 # Ensemble Settings
 ENSEMBLE_WEIGHTS = {
-    "moving_average_5_20": 0.3,
-    "moving_average_10_30": 0.2,
-    "lstm_seq10": 0.3,
-    "lstm_seq20": 0.2
+    "moving_average_5_20": 0.25,
+    "moving_average_10_30": 0.25,
+    "lstm_seq10": 0.25,
+    "lstm_seq20": 0.25
 }
 
 # Alert Settings
 ALERT_THRESHOLDS = {
-    "drawdown": -0.05,      # 5%のドローダウンでアラート
-    "profit": 0.1,          # 10%の利益でアラート
-    "volume_spike": 3.0     # 平均出来高の3倍でアラート
+    "drawdown": -0.03,      # 3%のドローダウンでアラート
+    "profit": 0.05,         # 5%の利益でアラート
+    "volume_spike": 2.5      # 平均出来高の2.5倍でアラート
 }
 
 def create_directories():

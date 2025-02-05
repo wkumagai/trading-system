@@ -13,7 +13,7 @@ import logging
 
 class TimeSeriesSplitter:
     """時系列データ分割クラス"""
-    
+
     def __init__(
         self,
         train_period: str = '2Y',
@@ -56,28 +56,28 @@ class TimeSeriesSplitter:
 
         start_date = dates.min()
         end_date = dates.max()
-        
+
         windows = []
         current_start = start_date
-        
+
         while current_start + self.train_period + self.validation_period <= end_date:
             train_end = current_start + self.train_period
             validation_end = train_end + self.validation_period
-            
+
             # 訓練データと検証データのサンプル数をチェック
             train_mask = (dates >= current_start) & (dates < train_end)
             valid_mask = (dates >= train_end) & (dates < validation_end)
-            
-            if (train_mask.sum() >= self.min_samples and 
+
+            if (train_mask.sum() >= self.min_samples and
                 valid_mask.sum() >= self.min_samples // 4):  # 検証期間は訓練期間の1/4以上
-                
+
                 windows.append({
                     'train': (current_start, train_end),
                     'validation': (train_end, validation_end)
                 })
-            
+
             current_start += self.step
-        
+
         self.logger.info(f"Created {len(windows)} time windows")
         return windows
 
@@ -136,42 +136,12 @@ class TimeSeriesSplitter:
 
         # 移動平均の計算
         ma = data['Close'].rolling(window=window_size).mean()
-        
+
         # トレンドの強さを計算
         trend_strength = abs(data['Close'] - ma) / ma
-        
+
         # 平均トレンド強度が閾値を超えていればトレンド相場
         if trend_strength.mean() > threshold:
             return 'trend'
         else:
             return 'range'
-
-if __name__ == "__main__":
-    # ロギングの設定
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s [%(levelname)s] %(message)s'
-    )
-    
-    # 使用例
-    # サンプルデータの作成
-    dates = pd.date_range(start='2020-01-01', end='2023-12-31', freq='D')
-    data = pd.DataFrame({
-        'Date': dates,
-        'Close': np.random.randn(len(dates)).cumsum() + 100
-    })
-    
-    # スプリッターの初期化と使用
-    splitter = TimeSeriesSplitter()
-    windows = splitter.create_windows(data)
-    
-    # 最初のウィンドウでデータを分割
-    if windows:
-        split_data = splitter.split_data(data, windows[0])
-        print("\nFirst window split:")
-        print(f"Training data: {len(split_data['train'])} samples")
-        print(f"Validation data: {len(split_data['validation'])} samples")
-        
-        # 市場フェーズの判定
-        phase = splitter.get_market_phase(split_data['train'])
-        print(f"\nMarket phase: {phase}")

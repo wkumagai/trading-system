@@ -1,6 +1,4 @@
 """
-preprocessor.py
-
 株価データの前処理を行うモジュール。
 欠損値処理、異常値検出、正規化などを実施。
 """
@@ -13,7 +11,7 @@ import logging
 
 class DataPreprocessor:
     """データ前処理クラス"""
-    
+
     def __init__(self):
         self.logger = logging.getLogger(__name__)
         self.scalers = {}
@@ -41,17 +39,17 @@ class DataPreprocessor:
             欠損値処理済みのデータ
         """
         df = df.copy()
-        
+
         for column, method in methods.items():
             if column not in df.columns:
                 continue
-                
+
             if method not in self.fill_methods:
                 self.logger.warning(f"Unknown fill method: {method}")
                 continue
-                
+
             df[column] = self.fill_methods[method](df[column])
-        
+
         return df
 
     def detect_outliers(
@@ -73,26 +71,26 @@ class DataPreprocessor:
         """
         df = df.copy()
         outliers = {}
-        
+
         for column in columns:
             if column not in df.columns:
                 continue
-                
+
             mean = df[column].mean()
             std = df[column].std()
-            
+
             lower_bound = mean - n_std * std
             upper_bound = mean + n_std * std
-            
+
             outliers[column] = df[
-                (df[column] < lower_bound) | 
+                (df[column] < lower_bound) |
                 (df[column] > upper_bound)
             ].index.tolist()
-            
+
             # 異常値を境界値で置換
             df.loc[df[column] < lower_bound, column] = lower_bound
             df.loc[df[column] > upper_bound, column] = upper_bound
-        
+
         return df, outliers
 
     def normalize_data(
@@ -115,13 +113,13 @@ class DataPreprocessor:
             正規化されたデータ
         """
         df = df.copy()
-        
+
         for column in columns:
             if column not in df.columns:
                 continue
-                
+
             scaler_key = f"{method}_{column}"
-            
+
             if fit or scaler_key not in self.scalers:
                 if method == 'minmax':
                     self.scalers[scaler_key] = MinMaxScaler()
@@ -129,7 +127,7 @@ class DataPreprocessor:
                     self.scalers[scaler_key] = StandardScaler()
                 else:
                     raise ValueError(f"Unknown normalization method: {method}")
-                
+
                 df[column] = self.scalers[scaler_key].fit_transform(
                     df[column].values.reshape(-1, 1)
                 ).flatten()
@@ -137,7 +135,7 @@ class DataPreprocessor:
                 df[column] = self.scalers[scaler_key].transform(
                     df[column].values.reshape(-1, 1)
                 ).flatten()
-        
+
         return df
 
     def add_time_features(
@@ -156,30 +154,30 @@ class DataPreprocessor:
             時間特徴量が追加されたデータ
         """
         df = df.copy()
-        
+
         if date_column in df.columns:
             dates = pd.to_datetime(df[date_column])
         else:
             dates = pd.to_datetime(df.index)
-        
+
         # 曜日（0=月曜、6=日曜）
         df['day_of_week'] = dates.dt.dayofweek
-        
+
         # 月（1-12）
         df['month'] = dates.dt.month
-        
+
         # 四半期（1-4）
         df['quarter'] = dates.dt.quarter
-        
+
         # 年
         df['year'] = dates.dt.year
-        
+
         # 月初からの経過日数
         df['day_of_month'] = dates.dt.day
-        
+
         # 年初からの経過日数
         df['day_of_year'] = dates.dt.dayofyear
-        
+
         return df
 
     def process_data(
@@ -205,45 +203,17 @@ class DataPreprocessor:
         """
         # 欠損値処理
         df = self.handle_missing_values(df, missing_methods)
-        
+
         # 異常値検出と処理
         df, outliers = self.detect_outliers(df, outlier_columns)
         if outliers:
             self.logger.info(f"Detected outliers: {outliers}")
-        
+
         # 時間特徴量の追加
         if add_time:
             df = self.add_time_features(df)
-        
+
         # データの正規化
         df = self.normalize_data(df, normalize_columns)
-        
-        return df
 
-if __name__ == "__main__":
-    # ロギングの設定
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s [%(levelname)s] %(message)s'
-    )
-    
-    # 使用例
-    # サンプルデータの作成
-    dates = pd.date_range(start='2020-01-01', end='2023-12-31', freq='D')
-    data = pd.DataFrame({
-        'Date': dates,
-        'Close': np.random.randn(len(dates)).cumsum() + 100,
-        'Volume': np.random.randint(1000, 10000, len(dates))
-    })
-    
-    # 前処理の実行
-    preprocessor = DataPreprocessor()
-    processed_data = preprocessor.process_data(
-        data,
-        missing_methods={'Close': 'ffill', 'Volume': 'zero'},
-        outlier_columns=['Close', 'Volume'],
-        normalize_columns=['Close', 'Volume']
-    )
-    
-    print("\nProcessed data sample:")
-    print(processed_data.head())
+        return df

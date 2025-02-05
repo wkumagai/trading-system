@@ -16,7 +16,7 @@ from plotly.subplots import make_subplots
 
 class PerformanceVisualizer:
     """パフォーマンス可視化クラス"""
-    
+
     def __init__(self, style: str = 'seaborn'):
         """
         Args:
@@ -40,17 +40,17 @@ class PerformanceVisualizer:
             save_path: 保存先パス
         """
         plt.figure(figsize=(12, 6))
-        
+
         for name, ret in returns.items():
             cum_returns = (1 + ret).cumprod()
             plt.plot(cum_returns.index, cum_returns.values, label=name)
-        
+
         plt.title(title)
         plt.xlabel('Date')
         plt.ylabel('Cumulative Return')
         plt.legend()
         plt.grid(True)
-        
+
         if save_path:
             plt.savefig(save_path)
         plt.show()
@@ -70,19 +70,19 @@ class PerformanceVisualizer:
             save_path: 保存先パス
         """
         plt.figure(figsize=(12, 6))
-        
+
         for name, ret in returns.items():
             cum_returns = (1 + ret).cumprod()
             running_max = cum_returns.cummax()
             drawdown = (cum_returns - running_max) / running_max
             plt.plot(drawdown.index, drawdown.values, label=name)
-        
+
         plt.title(title)
         plt.xlabel('Date')
         plt.ylabel('Drawdown')
         plt.legend()
         plt.grid(True)
-        
+
         if save_path:
             plt.savefig(save_path)
         plt.show()
@@ -108,7 +108,7 @@ class PerformanceVisualizer:
             monthly_returns.index.month
         ])
         monthly_returns = monthly_returns.unstack()
-        
+
         plt.figure(figsize=(12, 8))
         sns.heatmap(
             monthly_returns,
@@ -118,11 +118,11 @@ class PerformanceVisualizer:
             cmap='RdYlGn',
             cbar_kws={'label': 'Monthly Return'}
         )
-        
+
         plt.title(title)
         plt.xlabel('Month')
         plt.ylabel('Year')
-        
+
         if save_path:
             plt.savefig(save_path)
         plt.show()
@@ -148,7 +148,7 @@ class PerformanceVisualizer:
         fig, axes = plt.subplots(len(metrics), 1, figsize=(12, 4*len(metrics)))
         if len(metrics) == 1:
             axes = [axes]
-        
+
         for ax, metric in zip(axes, metrics):
             if metric == 'return':
                 rolling_metric = returns.rolling(window).mean() * 252
@@ -161,11 +161,11 @@ class PerformanceVisualizer:
                 rolling_vol = returns.rolling(window).std() * np.sqrt(252)
                 rolling_metric = rolling_return / rolling_vol
                 label = f'Rolling Sharpe Ratio ({window}d)'
-            
+
             ax.plot(rolling_metric.index, rolling_metric.values)
             ax.set_title(label)
             ax.grid(True)
-        
+
         plt.tight_layout()
         if save_path:
             plt.savefig(save_path)
@@ -199,7 +199,7 @@ class PerformanceVisualizer:
                 'Drawdown'
             )
         )
-        
+
         # 価格とポジション
         fig.add_trace(
             go.Scatter(
@@ -211,11 +211,11 @@ class PerformanceVisualizer:
             row=1,
             col=1
         )
-        
+
         # ポジションの可視化
         long_pos = positions[positions == 1].index
         short_pos = positions[positions == -1].index
-        
+
         fig.add_trace(
             go.Scatter(
                 x=long_pos,
@@ -227,7 +227,7 @@ class PerformanceVisualizer:
             row=1,
             col=1
         )
-        
+
         fig.add_trace(
             go.Scatter(
                 x=short_pos,
@@ -239,7 +239,7 @@ class PerformanceVisualizer:
             row=1,
             col=1
         )
-        
+
         # 累積リターン
         cum_returns = (1 + returns).cumprod()
         fig.add_trace(
@@ -252,7 +252,7 @@ class PerformanceVisualizer:
             row=2,
             col=1
         )
-        
+
         # ドローダウン
         running_max = cum_returns.cummax()
         drawdown = (cum_returns - running_max) / running_max
@@ -266,51 +266,14 @@ class PerformanceVisualizer:
             row=3,
             col=1
         )
-        
+
         # レイアウトの調整
         fig.update_layout(
             height=900,
             title_text="Trading Performance Dashboard",
             showlegend=True
         )
-        
+
         if save_path:
             fig.write_html(save_path)
         fig.show()
-
-if __name__ == "__main__":
-    # 使用例
-    # サンプルデータの生成
-    dates = pd.date_range(start='2020-01-01', end='2023-12-31', freq='D')
-    returns = pd.Series(
-        np.random.normal(0.001, 0.02, len(dates)),
-        index=dates
-    )
-    prices = 100 * (1 + returns).cumprod()
-    positions = pd.Series(
-        np.random.choice([-1, 0, 1], len(dates)),
-        index=dates
-    )
-    
-    # 可視化の実行
-    visualizer = PerformanceVisualizer()
-    
-    # 累積リターンのプロット
-    visualizer.plot_cumulative_returns(
-        {'Strategy': returns},
-        title="Strategy Cumulative Returns"
-    )
-    
-    # 月次リターンヒートマップ
-    visualizer.plot_monthly_returns_heatmap(
-        returns,
-        title="Monthly Returns Analysis"
-    )
-    
-    # インタラクティブダッシュボード
-    visualizer.create_interactive_dashboard(
-        returns,
-        positions,
-        prices,
-        save_path="dashboard.html"
-    )
